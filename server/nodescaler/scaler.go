@@ -186,7 +186,6 @@ func (s Server) cordonNodes(nl *nodeList, gameNumber int64) error {
 
 	// cordon them all
 	for _, n := range cNodes {
-		log.Printf("[Info][CordonNodes] Cordoning node: %v", n.Name)
 		err := s.cordon(&n, true)
 		if err != nil {
 			return err

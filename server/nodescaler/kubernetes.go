@@ -19,6 +19,8 @@ import (
 
 	"time"
 
+	"log"
+
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -29,9 +31,11 @@ import (
 
 const (
 	// Attribute key for where to put the timestamp when
-	// making changes to a node
-	timestampAnnotation = "nodescale/timestamp"
+	// a node becomes empty.
+	emptyAnnotation = "nodescale/timestamp"
 )
+
+var emptyTimestamptNotFound = errors.New("Empty timestamp was not found")
 
 // nodeList is the set of current nodes that this
 // server manages, with the accompanying pods for
@@ -200,24 +204,18 @@ func (s *Server) listNodePods(n v1.Node) (*v1.PodList, error) {
 
 // cordon sets or unsets a node to being unschedulable
 // a 'true' parameter will set a node to being unschedulable (cordoned)
-// this also sets a timestamp annotation on the node, to track when this was
-// last done.
 func (s *Server) cordon(n *v1.Node, unscheduled bool) error {
-	now, err := s.clock.Now().UTC().MarshalText()
-	if err != nil {
-		return errors.Wrap(err, "Could not marshall now datetime as string")
-	}
-
+	log.Printf("[Info][Cordon] Cordoningm Unschedulable: %v node: %v", unscheduled, n.Name)
 	n.Spec.Unschedulable = unscheduled
-	n.ObjectMeta.Annotations[timestampAnnotation] = string(now)
-	_, err = s.cs.CoreV1().Nodes().Update(n)
+	_, err := s.cs.CoreV1().Nodes().Update(n)
 	return errors.Wrapf(err, "Error Updating Node %#v", n)
 }
 
-// cordonTimestamp returns the timestamp for when the node was cordoned
-func cordonTimestamp(n v1.Node) (time.Time, error) {
+// emptyTimestamp returns the timestamp for when the node was cordoned
+// (assumes there is one)
+func emptyTimestamp(n v1.Node) (time.Time, error) {
+	// TODO: return the error not found, if it's not there.
 	var ts time.Time
-	err := ts.UnmarshalText([]byte(n.ObjectMeta.Annotations[timestampAnnotation]))
-
+	err := ts.UnmarshalText([]byte(n.ObjectMeta.Annotations[emptyAnnotation]))
 	return ts, errors.Wrapf(err, "Error unmarshalling the timestamp annotation from the node: %v", n.Name)
 }
